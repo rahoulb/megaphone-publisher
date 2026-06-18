@@ -52,6 +52,34 @@ checksum:
 release:
   draft: false
   prerelease: auto
+  footer: |
+    ## Install
+
+    Download the archive for your machine and unpack it:
+
+    - **Apple Silicon Mac** (M1/M2/M3/M4): `..._darwin_arm64.tar.gz`
+    - **Intel Mac**: `..._darwin_amd64.tar.gz`
+    - **Windows**: `..._windows_amd64.zip`
+    - **Linux**: `..._linux_amd64.tar.gz`
+
+    Then copy `megaphone.example.toml` → `megaphone.toml`, fill it in, and run
+    the binary next to it. Try `-no-publish` (leaves a draft) or `-dry-run`
+    (previews, no upload) first.
+
+    ### macOS: first run
+
+    The binaries aren't signed with an Apple Developer ID, so macOS blocks a
+    **downloaded** copy the first time with "cannot verify the developer." Clear
+    the quarantine flag once and it runs normally:
+
+    ```sh
+    xattr -d com.apple.quarantine megaphone-publisher
+    ./megaphone-publisher
+    ```
+
+    (Or: run it, then **System Settings → Privacy & Security → Open Anyway**.)
+
+    `checksums.txt` has SHA-256 sums for verification.
 
 changelog:
   use: github
