@@ -1,0 +1,63 @@
+# GoReleaser config — cross-compiles and publishes a GitHub Release on tag push.
+# Validate locally:  goreleaser check
+# Dry-run locally:   goreleaser release --snapshot --clean   (builds into ./dist)
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: megaphone-publisher
+    main: .
+    binary: megaphone-publisher
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      # No Windows on ARM build (not needed for this audience).
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    # Windows users get a .zip instead of a .tar.gz.
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    # Ship the docs, license and example config alongside the binary.
+    files:
+      - README.md
+      - LICENSE
+      - megaphone.example.toml
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  draft: false
+  prerelease: auto
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"

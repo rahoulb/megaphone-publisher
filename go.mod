@@ -1,4 +1,4 @@
-module megaphone-publisher
+module github.com/rahoulb/megaphone-publisher
 
 go 1.26.2
 
