@@ -28,15 +28,68 @@ func main() {
 	configPath := flag.String("config", "megaphone.toml", "path to the config file")
 	dryRun := flag.Bool("dry-run", false, "print what would happen without uploading or calling the API")
 	noPublish := flag.Bool("no-publish", false, "do everything but leave the episode as a draft (don't set the pubdate / go live)")
+	fast := flag.Bool("fast", false, "upload to S3 and YouTube concurrently (default is serial, to spare a thin uplink)")
+	ytLogin := flag.Bool("youtube-login", false, "sign in to YouTube in the browser (one-time) and cache the token")
+	ytCheck := flag.Bool("youtube-check", false, "verify YouTube auth by listing your channel's playlists")
 	flag.Parse()
 
-	if err := run(*configPath, *dryRun, *noPublish); err != nil {
+	var err error
+	switch {
+	case *ytLogin:
+		err = runYouTubeLogin(*configPath)
+	case *ytCheck:
+		err = runYouTubeCheck(*configPath)
+	default:
+		err = run(*configPath, *dryRun, *noPublish, *fast)
+	}
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "\n✗ %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(configPath string, dryRun, noPublish bool) error {
+// runYouTubeLogin does the one-time browser sign-in and caches the token.
+func runYouTubeLogin(configPath string) error {
+	cfg, err := loadConfig(configPath)
+	if err != nil {
+		return err
+	}
+	if !cfg.YouTube.Enabled {
+		return fmt.Errorf("youtube is not enabled in %s (set [youtube] enabled = true)", configPath)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	return cfg.YouTube.Login(ctx)
+}
+
+// runYouTubeCheck proves auth works by listing the channel's playlists.
+func runYouTubeCheck(configPath string) error {
+	cfg, err := loadConfig(configPath)
+	if err != nil {
+		return err
+	}
+	if !cfg.YouTube.Enabled {
+		return fmt.Errorf("youtube is not enabled in %s (set [youtube] enabled = true)", configPath)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	yt, err := newYT(ctx, cfg.YouTube)
+	if err != nil {
+		return err
+	}
+	playlists, err := yt.ListPlaylists()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("✓ YouTube auth OK. %d playlist(s) on your channel:\n", len(playlists))
+	for _, p := range playlists {
+		fmt.Printf("  - %s\n", p.Title)
+	}
+	return nil
+}
+
+func run(configPath string, dryRun, noPublish, fast bool) error {
+	_ = fast // wired into the S3+YouTube orchestration in the next increment
 	if err := mustReadable(configPath); err != nil {
 		return fmt.Errorf("can't open config file %q (put megaphone.toml next to the app, or pass -config): %w", configPath, err)
 	}

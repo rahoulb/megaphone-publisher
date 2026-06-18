@@ -1,6 +1,12 @@
 # Never commit the real config — it holds the Megaphone token and AWS keys.
 megaphone.toml
 
+# YouTube OAuth secrets — never commit these.
+youtube_client_secret*.json
+youtube_token*.json
+*client_secret*.json
+*token*.json
+
 # Build output
 megaphone-publisher
 megaphone-publisher.exe

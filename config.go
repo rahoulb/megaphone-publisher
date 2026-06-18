@@ -17,6 +17,21 @@ type Config struct {
 	Megaphone MegaphoneConfig `toml:"megaphone"`
 	S3        S3Config        `toml:"s3"`
 	Defaults  DefaultsConfig  `toml:"defaults"`
+	YouTube   YouTubeConfig   `toml:"youtube"`
+}
+
+type YouTubeConfig struct {
+	Enabled              bool     `toml:"enabled"`
+	ClientSecretFile     string   `toml:"client_secret_file"` // OAuth client JSON from Google Cloud
+	TokenCacheFile       string   `toml:"token_cache_file"`   // where the refresh token is cached
+	CategoryID           string   `toml:"category_id"`        // fixed YouTube list (default 17 = Sports)
+	DefaultLanguage      string   `toml:"default_language"`
+	DefaultAudioLanguage string   `toml:"default_audio_language"`
+	MadeForKids          bool     `toml:"made_for_kids"`     // false = "Made for kids: NO"
+	License              string   `toml:"license"`           // youtube | creativeCommon
+	NotifySubscribers    bool     `toml:"notify_subscribers"`
+	Tags                 []string `toml:"tags"`
+	DefaultPlaylists     []string `toml:"default_playlists"` // playlist titles pre-ticked at the prompt
 }
 
 type MegaphoneConfig struct {
@@ -77,6 +92,20 @@ func loadConfig(path string) (*Config, error) {
 		c.Defaults.EpisodeType = "full"
 	}
 
+	// YouTube fallbacks (only meaningful when enabled).
+	if c.YouTube.CategoryID == "" {
+		c.YouTube.CategoryID = "17" // Sports
+	}
+	if c.YouTube.DefaultLanguage == "" {
+		c.YouTube.DefaultLanguage = "en"
+	}
+	if c.YouTube.DefaultAudioLanguage == "" {
+		c.YouTube.DefaultAudioLanguage = "en"
+	}
+	if c.YouTube.License == "" {
+		c.YouTube.License = "youtube"
+	}
+
 	if err := c.validate(); err != nil {
 		return nil, err
 	}
@@ -99,6 +128,14 @@ func (c *Config) validate() error {
 	}
 	if c.S3.Region == "" {
 		missing = append(missing, "s3.region")
+	}
+	if c.YouTube.Enabled {
+		if c.YouTube.ClientSecretFile == "" {
+			missing = append(missing, "youtube.client_secret_file")
+		}
+		if c.YouTube.TokenCacheFile == "" {
+			missing = append(missing, "youtube.token_cache_file")
+		}
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("config is missing required values: %v", missing)

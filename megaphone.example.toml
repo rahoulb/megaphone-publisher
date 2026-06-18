@@ -43,3 +43,18 @@ min_seconds_for_ads = 300          # 5 minutes
 preroll_ad_count = 3               # 3 pre-roll slots in one break (if > 5 min)
 postroll_ad_count = 3              # 3 post-roll slots (always)
 midroll_ad_count = 1               # ad slots per mid-roll break
+
+# Optional: also publish to YouTube. Leave enabled = false (or omit this whole
+# section) to skip YouTube entirely. See YOUTUBE.md for the one-time setup.
+[youtube]
+enabled = false
+client_secret_file = "youtube_client_secret.json"  # downloaded from Google Cloud
+token_cache_file   = "youtube_token.json"          # created by `-youtube-login`
+category_id = "17"                 # fixed YouTube list; 17 = Sports
+default_language = "en"
+default_audio_language = "en"
+made_for_kids = false              # "Made for kids: NO"
+license = "youtube"
+notify_subscribers = true
+tags = ["Nottingham Forest", "1865", "World Cup", "football"]
+default_playlists = ["1865 Group of Death"]   # pre-ticked at the prompt

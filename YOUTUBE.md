@@ -1,7 +1,23 @@
 # YouTube publishing — design note
 
-**Status: planned, not built.** This captures the agreed design and the YouTube
-specifics so it's ready to pick up. Nothing here is implemented yet.
+**Status: in progress** on branch `feature/youtube-publishing`. Done so far:
+OAuth loopback sign-in (`-youtube-login`), token caching, and playlist listing
+(`-youtube-check`). Still to do: the upload → wait-for-scan → publish
+orchestration and the `--fast`/serial wiring.
+
+## Setup: create the Google OAuth client (do this once)
+
+1. Go to <https://console.cloud.google.com/> and create (or pick) a project.
+2. **APIs & Services → Library →** enable **"YouTube Data API v3"**.
+3. **APIs & Services → OAuth consent screen:** User type **External**; fill in
+   app name + your email. Add yourself (and anyone else who'll publish) as
+   **Test users**. (While in "Testing", refresh tokens expire after 7 days —
+   fine to start; publish/verify the app later to make them long-lived.)
+4. **APIs & Services → Credentials → Create Credentials → OAuth client ID →**
+   Application type **Desktop app**. Download the JSON.
+5. Save that JSON next to the binary as `youtube_client_secret.json` (matches
+   `client_secret_file` in the config), set `[youtube] enabled = true`, then run
+   `./megaphone-publisher -youtube-login` once, and `-youtube-check` to confirm.
 
 ## The idea
 
