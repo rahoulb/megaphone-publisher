@@ -28,29 +28,51 @@ we decided is overkill for a small utility.
 - **`--fast`:** run the S3 and YouTube uploads concurrently. For fat pipes with
   headroom.
 
-We deliberately are **not** auto-detecting connection speed: a synthetic
-speedtest is noisy, adds dead time, and a wrong guess is worse than no guess. The
-user knows their connection. (If we ever want auto-tuning, the sound version is
-to measure the *real* S3 upload throughput in-flight — we already track upload
-bytes for the progress bar — and decide whether to fire YouTube alongside it
-after the first ~30s/~100MB. v2 nicety, not now.)
+No auto speed-detection: a synthetic speedtest is noisy and a wrong guess is
+worse than no guess. (Possible v2: measure the real S3 throughput in-flight and
+decide. Not now.)
 
-### Draft → review → publish
+## Upload → wait for YouTube's scan → publish
 
-Mirror the Megaphone draft model: upload as **`unlisted`** (or `private`), leave
-it for review, then flip to `public` with `videos.update`. With `-no-publish`
-the YouTube video stays unlisted, same as the Megaphone draft.
+This mirrors the Megaphone draft→process→publish flow, and it's the safe order:
+**never set a video `public` while YouTube is still processing it.** If their
+automated checks flag something on an already-public video, that's the
+worst-case (strike/blacklist) we want to avoid. So:
 
-### Not possible via the API (don't promise these)
+1. **Upload as `private`** (not even unlisted — fully hidden until cleared).
+2. **Poll** `videos.list` with `part=status,processingDetails` until YouTube has
+   finished:
+   - ready when `processingDetails.processingStatus == "succeeded"` **and**
+     `status.uploadStatus == "processed"`.
+   - **abort/publish-block** if `status.uploadStatus == "rejected"` — report
+     `status.rejectionReason` (e.g. `copyright`, `duplicate`, `inappropriate`)
+     and do **not** go public.
+3. **Publish:** `videos.update` sets `privacyStatus = public`.
 
-- **Monetisation / ad settings** — managed in YouTube Studio (or the Content
-  Owner API for partners), not the public Data API.
-- **Mid-roll ad break placement** — not in the Data API. So the cuepoint logic
-  does **not** carry over to YouTube; ad breaks are YouTube's to place.
+Under `-no-publish`, stop after step 2 and leave it **private** for manual review
+in Studio — same as the Megaphone draft.
 
-## Metadata YouTube needs (`videos.insert`)
+**Honest caveat:** "processed & not rejected" is the best *programmatic* signal
+that YouTube has finished its initial pass; it is not a guaranteed human
+all-clear, and Content ID claims can still appear later. But it removes the
+"public while still processing" window, which is the actual risk you raised.
 
-`videos.insert` takes `part=snippet,status` (+ the media). Fields:
+## "Categories" = playlists
+
+What the account calls categories (e.g. **"1865 Group of Death"**) are
+**playlists** in API terms. Flow:
+
+- On run, `playlists.list?mine=true&part=snippet` → list the channel's playlists
+  by title.
+- Let the user **tick one or more** that apply (config can hold the usual
+  defaults, e.g. always add to "1865 Group of Death").
+- After the video is created, `playlistItems.insert` once per selected playlist
+  (`snippet.playlistId` + `snippet.resourceId = {kind: youtube#video, videoId}`).
+
+This is separate from the API's required `categoryId` (the fixed YouTube list) —
+we set that quietly from config (default **"17" = Sports**).
+
+## Metadata YouTube needs (`videos.insert`, `part=snippet,status`)
 
 ### snippet
 
@@ -59,90 +81,99 @@ the YouTube video stays unlisted, same as the Megaphone draft.
 | `title` | **yes** | reuse the episode title | ≤100 chars, no `< >` |
 | `description` | no | reuse the episode description | ≤5000 bytes, no `< >` |
 | `tags[]` | no | config default + per-episode | ≤500 chars total |
-| `categoryId` | **yes** | config (default **"17" = Sports**) | region-dependent; confirm via `videoCategories.list` |
+| `categoryId` | **yes** | config (default **"17" = Sports**) | the fixed YouTube list, *not* the playlists above |
 | `defaultLanguage` | no | config (default `en`) | language of title/description |
 | `defaultAudioLanguage` | no | config (default `en`) | spoken language |
 
 ### status
 
-| Field | Required | Default we'd send | Notes |
+| Field | Required | Value we'd send | Notes |
 |---|---|---|---|
-| `privacyStatus` | no | `unlisted` on upload → `public` to go live | `private`/`unlisted`/`public` |
-| `selfDeclaredMadeForKids` | **effectively yes** | **`false`** ("Made for kids → NO") | COPPA declaration; YouTube wants an explicit audience |
-| `containsSyntheticMedia` | no | `false` | altered/synthetic (AI) content disclosure |
+| `privacyStatus` | no | `private` on upload → `public` after scan | holding state is private |
+| `selfDeclaredMadeForKids` | **effectively yes** | **`false`** ("Made for kids → NO") | COPPA declaration |
+| `containsSyntheticMedia` | no | `false` | altered/synthetic (AI) disclosure |
 | `license` | no | `youtube` | or `creativeCommon` |
 | `embeddable` | no | `true` | |
-| `publicStatsViewable` | no | leave default | stats on watch page |
-| `publishAt` | no | unset | scheduled go-live; **requires `privacyStatus: private`** |
+| `publishAt` | no | unset | scheduled go-live; needs `privacyStatus: private` (could power a "schedule" mode later) |
 
-Insert call parameter `notifySubscribers` (default true) — worth a config toggle.
+Insert parameter `notifySubscribers` (default true) — worth a config toggle.
 
-## Subtitles / captions (the `.srt`)
+## Subtitles — deferred
 
-A separate call **after** the video exists — `captions.insert`:
+`.srt` upload is **out of scope for now** (Baz will add captions manually in
+Studio when needed). If we revisit: it's a separate `captions.insert` call after
+the video exists (needs the `youtube.force-ssl` scope, 400 quota units, accepts
+SubRip). Noted here so it's not forgotten.
 
-- **snippet:** `videoId` (the new video), `language` (e.g. `en`), `name` (track
-  label, e.g. "English"), optional `isDraft`.
-- **media:** the caption file, up to 100MB. The API accepts `application/octet-stream`
-  (SubRip `.srt` works in practice; YouTube parses it).
-- **Scope:** needs `youtube.force-ssl` (broader than upload). **Quota: 400 units.**
-- In the tool: an **optional `.srt` path** prompt; if given, upload it once the
-  video insert returns an id.
+## OAuth — browser sign-in
 
-## Optional extras (later)
+The "click a link, sign in, done" experience is the standard **installed-app
+loopback flow**, and it's a good fit:
 
-- **Thumbnail** — `thumbnails.set` (channel must be verified).
-- **Playlist** — `playlistItems.insert` to drop the episode into a season /
-  "Group of Death" playlist.
+1. The tool starts a tiny local web server on `127.0.0.1:<port>`.
+2. It opens the browser to Google's consent screen.
+3. You sign in and approve; Google redirects back to `127.0.0.1`, the tool
+   catches the code and exchanges it for tokens, then caches the refresh token.
 
-## OAuth & quota — the real friction (flag before building)
+Subsequent runs use the cached refresh token silently — no browser.
 
-YouTube is **not** a paste-a-token affair like Megaphone:
+**Scopes:** more than just upload, because we also flip privacy and add to
+playlists:
+- `youtube.upload` (insert), **plus** a read/write scope —
+  `https://www.googleapis.com/auth/youtube` — for `videos.update`,
+  `playlists.list`, and `playlistItems.insert`. (`youtube.force-ssl` would also
+  cover all of these, and captions later, in one scope.)
 
-- **OAuth 2.0** with scopes `youtube.upload` **and** `youtube.force-ssl` (the
-  latter for captions). Both are *sensitive* scopes. Per-channel: each person
-  uploading authorises their own channel; the OAuth client lives in a Google
-  Cloud project (Baz's).
-- **Refresh-token expiry gotcha:** while the OAuth app is in **"Testing"**
-  publishing status, refresh tokens **expire after 7 days** → weekly re-auth.
-  Long-lived tokens require moving the app to **"In production"**, which for
-  sensitive scopes can trigger Google **app verification**. This materially
-  affects the "hand it to your brother" model and is the main thing to resolve
-  before building.
-- **Quota:** default 10,000 units/day. `videos.insert` ≈ **1600**, `captions.insert`
-  = **400**, a privacy-flip `videos.update` ≈ 50. So ~5 full publishes/day on the
-  default quota — fine for a weekly show, but it's a ceiling to be aware of.
+**Refresh-token caveat (still applies):** while the OAuth app is in Google
+"Testing" status, refresh tokens **expire after 7 days** → weekly re-sign-in.
+Long-lived tokens need the app moved to "In production", which for these
+sensitive scopes can trigger Google app verification. Fine for "just Baz" in
+testing; the thing to resolve before sharing it wider.
+
+## Quota
+
+Default 10,000 units/day. `videos.insert` ≈ **1600**, each `playlistItems.insert`
+≈ **50**, the publish `videos.update` ≈ **50**, status polls ≈ **1** each. Easily
+a handful of full publishes/day — fine for a weekly show.
+
+## Not possible via the Data API (don't promise these)
+
+- **Monetisation / ad settings** — Studio only.
+- **Mid-roll ad break placement** — not in the API; cuepoint logic does **not**
+  carry over to YouTube.
 
 ## Proposed config additions (sketch)
 
 ```toml
 [youtube]
 enabled = true
-# OAuth client (from the Google Cloud project) + where the refresh token is cached
-client_secret_file = "youtube_client_secret.json"
-token_cache_file   = "youtube_token.json"
-category_id = "17"                 # Sports
+client_secret_file = "youtube_client_secret.json"  # OAuth client from Google Cloud project
+token_cache_file   = "youtube_token.json"          # cached refresh token
+category_id = "17"                 # Sports (the fixed YouTube list)
 default_language = "en"
 default_audio_language = "en"
-privacy_on_upload = "unlisted"     # flip to public on publish
+privacy_after_scan = "public"      # holding state is always private until cleared
 made_for_kids = false              # "Made for kids → NO"
 contains_synthetic_media = false
 license = "youtube"
 notify_subscribers = true
 tags = ["Nottingham Forest", "1865", "World Cup", "football"]
-playlist_id = ""                   # optional
+default_playlists = ["1865 Group of Death"]   # pre-ticked; user can add/remove at the prompt
 ```
 
-Per-episode prompts to add: **subtitles `.srt` path (optional)**, and probably a
-**tags** override. Title/description are reused from what's already entered.
+Per-episode prompts to add: **which playlist(s)** apply (pre-ticked from
+`default_playlists`), and optionally a **tags** override. Title/description are
+reused from what's already entered for Megaphone.
 
 ## Build order when greenlit
 
-1. Google Cloud project + OAuth client; resolve the Testing-vs-production /
-   verification question (it gates the whole "others can use it" story).
-2. OAuth device/loopback flow in the binary; cache + refresh the token.
-3. Resumable `videos.insert` (unlisted) running serial-by-default / `--fast`.
-4. `captions.insert` for the optional `.srt`.
-5. `videos.update` to flip `unlisted → public` at publish time (skipped under
-   `-no-publish`).
-6. Optional: playlist add, custom thumbnail.
+1. Google Cloud project + OAuth client (Desktop app type); decide Testing vs
+   production/verification (gates the "others can use it" story).
+2. Loopback OAuth flow in the binary; cache + refresh the token.
+3. `playlists.list` → present playlists, multi-select.
+4. Resumable `videos.insert` as **private**, serial-by-default / `--fast`.
+5. Poll `processingDetails`/`status` until processed & not rejected (handle
+   `rejected` → stop, report reason).
+6. `playlistItems.insert` for each chosen playlist.
+7. `videos.update` to flip `private → public` (skipped under `-no-publish`).
+8. Later/optional: subtitles, custom thumbnail, scheduled `publishAt`.
