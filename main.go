@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Rahoul Baruah
+
 // megaphone-publisher: a single self-contained tool to publish a (video)
 // podcast episode to Megaphone.fm — upload the file, create the episode, wait
 // for processing, set the ad cuepoints, and publish.

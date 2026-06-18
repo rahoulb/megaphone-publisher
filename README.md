@@ -79,3 +79,19 @@ confirm end-to-end:
 ## Not done yet
 
 - YouTube publishing (you mentioned it's for later).
+
+## Install
+
+Download a prebuilt binary from the [Releases](https://github.com/rahoulb/megaphone-publisher/releases)
+page, or build from source:
+
+```sh
+go install github.com/rahoulb/megaphone-publisher@latest
+# or
+git clone https://github.com/rahoulb/megaphone-publisher && cd megaphone-publisher && go build .
+```
+
+## License
+
+Copyright (C) 2026 Rahoul Baruah. Licensed under the
+[GNU Affero General Public License v3.0 or later](LICENSE) (AGPL-3.0-or-later).
