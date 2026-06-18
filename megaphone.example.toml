@@ -1,0 +1,45 @@
+# Megaphone publisher config.
+# Copy this to "megaphone.toml" and put it next to the app, then fill it in.
+# Treat this file like a password — it contains your Megaphone token.
+
+[megaphone]
+# Megaphone -> hover your initials (lower-left) -> Settings -> Generate New Token
+token = "PASTE_YOUR_MEGAPHONE_TOKEN"
+# These identify your network and the show. Find them in the Megaphone URLs,
+# or ask whoever set up the account. The podcast (show) is created once; this
+# tool only creates episodes inside it.
+network_id = "PASTE_NETWORK_ID"
+podcast_id = "PASTE_PODCAST_ID"
+# base_url = "https://cms.megaphone.fm/api"   # optional; this is the default
+
+[s3]
+# The video is uploaded here first, then Megaphone fetches it from a temporary
+# signed link. You need a bucket Megaphone's servers can reach.
+bucket = "your-bucket-name"
+region = "eu-west-2"
+key_prefix = "wcw-uploads/"        # optional folder inside the bucket
+# Credentials: either name an AWS profile from ~/.aws/credentials …
+profile = ""
+# … or paste keys directly (leave profile blank if you do this):
+access_key_id = ""
+secret_access_key = ""
+presign_hours = 6                  # how long Megaphone has to fetch the file
+
+# Constant fields, the same on every episode (title / description / clean title
+# / season / episode / type / rating are asked for when you run the app).
+[defaults]
+subtitle = "1865: The ORIGINAL Nottingham Forest Podcast"
+link = "https://eighteensixtyfive.football"   # episode URL
+author = ""                        # optional; blank = leave to the podcast default
+background_image_file_url = ""     # optional episode artwork URL
+
+# Per-episode defaults (overridable at the prompt). Season/episode numbers
+# default automatically to "latest episode + 1" pulled from the API.
+episode_type = "full"              # full | trailer | bonus
+explicit_rating = false            # false = Clean (default), true = Explicit
+
+# Ad cuepoint rules
+min_seconds_for_ads = 300          # 5 minutes
+preroll_ad_count = 3               # 3 pre-roll slots in one break (if > 5 min)
+postroll_ad_count = 3              # 3 post-roll slots (always)
+midroll_ad_count = 1               # ad slots per mid-roll break
