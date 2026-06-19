@@ -117,8 +117,14 @@ func tokenFromWeb(ctx context.Context, oc *oauth2.Config) (*oauth2.Token, error)
 	go srv.Serve(ln)
 	defer srv.Shutdown(context.Background())
 
-	// AccessTypeOffline + prompt=consent guarantees a refresh token comes back.
-	authURL := oc.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
+	// AccessTypeOffline guarantees a refresh token. prompt="select_account consent"
+	// forces the account/channel picker — important for Brand Accounts, so you
+	// get the "Choose a channel" step instead of silently reusing a remembered
+	// (personal) channel.
+	authURL := oc.AuthCodeURL(state,
+		oauth2.AccessTypeOffline,
+		oauth2.SetAuthURLParam("prompt", "select_account consent"),
+	)
 	fmt.Println("Opening your browser to sign in to YouTube…")
 	fmt.Printf("If it doesn't open, visit this URL:\n  %s\n", authURL)
 	_ = openBrowser(authURL)
