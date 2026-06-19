@@ -1,6 +1,13 @@
 # Never commit the real config — it holds the Megaphone token and AWS keys.
 megaphone.toml
 
+# YouTube OAuth secrets — never commit these (they sit in the working dir
+# regardless of branch, so they must be ignored here on develop too).
+youtube_client_secret*.json
+youtube_token*.json
+*client_secret*.json
+*token*.json
+
 # Build output
 megaphone-publisher
 megaphone-publisher.exe
