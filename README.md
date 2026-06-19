@@ -82,29 +82,32 @@ confirm end-to-end:
 
 ## Install
 
-Download the archive for your machine from the
+Download the zip for your machine from the
 [Releases](https://github.com/rahoulb/megaphone-publisher/releases) page and
-unpack it:
+unzip it. The binary inside is always called `megaphone-publisher` (no arch
+suffix), so the command is the same everywhere:
 
-- **Apple Silicon Mac** (M1/M2/M3/M4): `..._darwin_arm64.tar.gz`
-- **Intel Mac**: `..._darwin_amd64.tar.gz`
-- **Windows**: `..._windows_amd64.zip`
-- **Linux**: `..._linux_amd64.tar.gz`
+- **Apple Silicon Mac** (M1/M2/M3/M4): `darwin_arm64.zip`
+- **Intel Mac**: `darwin_amd64.zip`
+- **Windows**: `windows_amd64.zip`
+- **Linux**: `linux_amd64.zip`
 
-### macOS: first run (Gatekeeper)
-
-The binaries aren't signed with an Apple Developer ID, so the first time you run
-a **downloaded** copy macOS blocks it with "cannot verify the developer." This is
-expected — clear the download quarantine flag once and it'll run normally:
+### macOS / Linux: first run
 
 ```sh
-cd /path/to/unpacked/folder
-xattr -d com.apple.quarantine megaphone-publisher   # run once
+chmod +x megaphone-publisher    # if it isn't already executable
 ./megaphone-publisher
 ```
 
-(GUI alternative: try to run it, then go to **System Settings → Privacy &
-Security** and click **Open Anyway**.)
+If macOS blocks it with "cannot verify the developer" (it won't always — depends
+how you downloaded it), clear the quarantine flag once:
+
+```sh
+xattr -d com.apple.quarantine megaphone-publisher
+```
+
+(GUI alternative: try to run it, then **System Settings → Privacy & Security →
+Open Anyway**.)
 
 ### Build from source instead
 
