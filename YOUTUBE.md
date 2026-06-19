@@ -1,8 +1,29 @@
 # YouTube publishing — design note
 
-**Status: in progress** on branch `feature/youtube-publishing`. Done so far:
-OAuth loopback sign-in (`-youtube-login`), token caching, and playlist listing
-(`-youtube-check`). Still to do: the upload → wait-for-scan → publish
+**Status: ON HOLD** on branch `feature/youtube-publishing` (not merged to
+develop). YouTube is being published **manually** for now.
+
+Done: OAuth loopback sign-in (`-youtube-login`), token caching, playlist listing
+(`-youtube-check`), and the (unwired) insert/wait/publish/playlist methods.
+
+**Blocker — Brand Account channel selection.** The 1865 channel is a Brand
+Account; the operator (rahoul.baruah@gmail.com) is a *manager* and can switch
+into it on youtube.com. But during OAuth, Google shows only the personal Google
+account at "Choose an account" and **never presents the YouTube "Choose a
+channel" step**, so the token resolves to the personal channel and
+`-youtube-check` lists personal playlists. Tried: revoking the app's prior grant
+at myaccount.google.com/connections, deleting the cached token, and
+`prompt=select_account consent` — the channel chooser still doesn't appear.
+
+Plan B to try when resumed (any of):
+- Sign in with / get the credentials of the Google account that *owns* (not just
+  manages) the 1865 Brand Account.
+- Have an Owner of the Brand Account confirm the operator's role is **Owner**
+  (some brand channel selectors only surface for owners, not managers).
+- Investigate whether a dedicated Google account should be made a Brand Account
+  owner specifically for API publishing.
+
+Still to do after auth is unblocked: the upload → wait-for-scan → publish
 orchestration and the `--fast`/serial wiring.
 
 ## Setup: create the Google OAuth client (do this once)
